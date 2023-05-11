@@ -550,7 +550,7 @@ def start_training(args, model, optimizer, lr_scheduler, start_epoch):
                 last_global_step=global_step,
                 last_global_data_samples=global_data_samples,
                 exp_start_marker=args.exp_start_marker,
-                ckpt_id="latest_checkpoint",
+                ckpt_id=f"checkpoint_global_data_samples_{str(global_data_samples).zfill(10)}",
             )
             dist.barrier()
     logger.info(
