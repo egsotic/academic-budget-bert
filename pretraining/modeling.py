@@ -233,7 +233,11 @@ class RMSNorm(torch.nn.Module):
         return self.scale * x_normed
 
 
-LAYER_NORM_TYPES = {"pytorch": nn.LayerNorm, "apex": get_apex_layer_norm(), "rms_norm": RMSNorm}
+LAYER_NORM_TYPES = {
+    "pytorch": nn.LayerNorm,
+    # "apex": get_apex_layer_norm(),
+    "rms_norm": RMSNorm
+}
 
 
 def get_layer_norm_type(config):
