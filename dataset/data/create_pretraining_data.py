@@ -26,7 +26,7 @@ from io import open
 import h5py
 import numpy as np
 from tqdm import tqdm
-from transformers import BertTokenizer
+from transformers import AutoTokenizer, BertTokenizer
 
 from utils import convert_to_unicode
 
@@ -530,8 +530,15 @@ def main():
         "--vocab_file",
         default=None,
         type=str,
-        required=True,
+        required=False,
         help="The vocabulary the BERT model will train on.",
+    )
+    parser.add_argument(
+        "--tokenizer_name_or_path",
+        default=None,
+        type=str,
+        required=False,
+        help="The tokenizer name or path.",
     )
     parser.add_argument(
         "--input_file",
@@ -607,7 +614,14 @@ def main():
 
     args = parser.parse_args()
 
-    tokenizer = BertTokenizer(args.vocab_file, do_lower_case=args.do_lower_case, max_len=512)
+    if args.tokenizer_name_or_path is None:
+        tokenizer = BertTokenizer(args.vocab_file,
+                                  do_lower_case=args.do_lower_case,
+                                  max_len=512)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name_or_path,
+                                                  do_lower_case=args.do_lower_case,
+                                                  max_len=512)
 
     input_files = []
     if os.path.isfile(args.input_file):

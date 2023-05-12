@@ -37,7 +37,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--dup_factor", type=int, default=1, help="sentence duplication factor")
     parser.add_argument("--seed", type=int, default=555)
-    parser.add_argument("--vocab_file", type=str, help="vocab file")
+    parser.add_argument("--vocab_file", type=str, help="vocab file", required=False)
+    parser.add_argument("--tokenizer_name_or_path", type=str, help="tokenizer name or path", required=False)
     parser.add_argument(
         "--do_lower_case", type=int, default=1, help="lower case True = 1, False = 0"
     )
@@ -84,6 +85,9 @@ if __name__ == "__main__":
         hdf5_preprocessing_cmd += f" --output_file={output_filename}"
         hdf5_preprocessing_cmd += (
             f" --vocab_file={args.vocab_file}" if args.vocab_file is not None else ""
+        )
+        hdf5_preprocessing_cmd += (
+            f" --tokenizer_name_or_path={args.tokenizer_name_or_path}" if args.tokenizer_name_or_path is not None else ""
         )
         hdf5_preprocessing_cmd += (
             f" --bert_model={args.model_name}" if args.model_name is not None else ""
