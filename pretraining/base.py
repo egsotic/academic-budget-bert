@@ -19,7 +19,7 @@ import json
 import logging
 import os
 
-from transformers import BertTokenizer, RobertaTokenizer
+from transformers import BertTokenizer, RobertaTokenizer, AutoTokenizer
 
 from pretraining.configs import PretrainedBertConfig, PretrainedRobertaConfig
 from pretraining.modeling import BertForPreTraining, BertLMHeadModel
@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 MODELS = {
+    "bert-mlm-auto": (BertLMHeadModel, PretrainedBertConfig, AutoTokenizer),
     "bert-mlm": (BertLMHeadModel, PretrainedBertConfig, BertTokenizer),
     "bert-mlm-roberta": (BertLMHeadModel, PretrainedRobertaConfig, RobertaTokenizer),
     "bert-mlm-nsp": (BertForPreTraining, PretrainedBertConfig, BertTokenizer),
