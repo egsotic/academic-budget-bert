@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import argparse
+import glob
 import logging
 import os
 import subprocess
@@ -23,10 +24,11 @@ logger = logging.getLogger()
 
 def list_files_in_dir(dir, data_prefix=".txt"):
     dataset_files = [
-        os.path.join(dir, f)
-        for f in os.listdir(dir)
-        if os.path.isfile(os.path.join(dir, f)) and data_prefix in f
+        f
+        for f in glob.glob(f"/home/nlp/egsotic/data/playground/**/*{data_prefix}*", recursive=True)
+        if os.path.isfile(f)
     ]
+    
     return dataset_files
 
 
