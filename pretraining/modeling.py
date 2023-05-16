@@ -29,6 +29,7 @@ import logging
 import math
 import os
 import sys
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -39,7 +40,7 @@ from torch.nn.modules.loss import MSELoss
 from torch.nn.parameter import Parameter
 from torch.utils import checkpoint
 from transformers import BertConfig, PreTrainedModel
-from transformers.modeling_outputs import SequenceClassifierOutput
+from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
 
 logger = logging.getLogger(__name__)
 
@@ -1163,6 +1164,57 @@ class BertForSequenceClassification(BertPreTrainedModel):
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=None,
+            attentions=None,
+        )
+
+class BertForTokenClassification(BertPreTrainedModel):
+    def __init__(self, config, args=None):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+
+        self.bert = BertModel(config, args)
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        attention_mask=None,
+        labels=None,
+        checkpoint_activations=False,
+        **kwargs,
+    ):
+
+        outputs = self.bert(
+            input_ids,
+            token_type_ids,
+            attention_mask,
+            output_all_encoded_layers=False,
+            checkpoint_activations=checkpoint_activations,
+        )
+
+        # NOTE: original huggingface implementation doesn't use pooled output
+        pooled_output = outputs[0]
+
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+
+        loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+
+        return TokenClassifierOutput(
             loss=loss,
             logits=logits,
             hidden_states=None,
