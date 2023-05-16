@@ -25,7 +25,7 @@ logger = logging.getLogger()
 def list_files_in_dir(dir, data_prefix=".txt"):
     dataset_files = [
         f
-        for f in glob.glob(f"/home/nlp/egsotic/data/playground/**/*{data_prefix}*", recursive=True)
+        for f in glob.glob(f"{dir}/**/*{data_prefix}*", recursive=True)
         if os.path.isfile(f)
     ]
     
