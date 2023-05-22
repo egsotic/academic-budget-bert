@@ -48,7 +48,7 @@ def find_num_samples_in_shard(files):
 
 
 
-def balance(files, out_dir):
+def balance(files, out_dir, fix_rename, fix_rename_prefix):
     lengths = find_num_samples_in_shard(files)
     if len(lengths) == 0:
         return
@@ -62,7 +62,7 @@ def balance(files, out_dir):
 
     file_content = {}
     print("Re sharding data into equal blocks")
-    for length, file in tqdm(lengths):
+    for i, (length, file) in tqdm(enumerate(lengths)):
         f = h5py.File(file, "r")
         keys = list(f.keys())
         data_type = {}
@@ -74,7 +74,12 @@ def balance(files, out_dir):
                 file_content[key].append(np.asarray(f[key][:]))
                 # file_content acts like a stack containing the most recent data that has been read
         f.close()
-        fout = h5py.File(os.path.join(out_dir, os.path.basename(file)), "w", libver="latest")
+        
+        if fix_rename:
+            out_path = os.path.join(out_dir, fix_rename_prefix + str(i) + ".hdf5")
+        else:
+            out_path = os.path.join(out_dir, os.path.basename(file))
+        fout = h5py.File(out_path, "w", libver="latest")
 
         for key in keys:
             fout.create_dataset(key, data=get_partial_numpy(file_content[key], average_length), dtype=data_type[key], compression="gzip")
@@ -82,16 +87,23 @@ def balance(files, out_dir):
             # since they have already been writtent into shards
         fout.close()
 
-def main(files, out_dir):
+def main(files, out_dir, fix_rename):
     train_files = [file for file in files if "train_shard" in file]
     test_files = [file for file in files if "test_shard" in file]
-    balance(train_files, out_dir)
-    balance(test_files, out_dir)
+    balance(train_files, out_dir, fix_rename, "train_shard_")
+    balance(test_files, out_dir, fix_rename, "test_shard_")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir")
-    parser.add_argument("--out-dir")
+    parser.add_argument("--out_dir")
+    parser.add_argument("--fix_rename", action='store_true')
     args = parser.parse_args()
-    files = glob.glob(os.path.join(args.dir, "*"))
-    main(files, args.out_dir)
+    files = glob.glob(os.path.join(args.dir, "**/*.hdf5"), recursive=True)
+    
+    # make sure no file name collision OR fix_rename is enabled
+    if not args.fix_rename and len(set(os.path.basename(f) for f in files)) != len(files):
+        print('detected same name of multiple files, use --fix_rename to rename names')
+        exit(1)
+        
+    main(files, args.out_dir, args.fix_rename)
