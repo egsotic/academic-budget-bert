@@ -13,6 +13,11 @@ output_path=${data_path/\/shards\//\/shards_yap_md_seg\/}
 
 echo "data path: ${data_path}"
 
+mkdir -p $(dirname $raw_tokens_path)
+mkdir -p $(dirname $ma_path)
+mkdir -p $(dirname $md_path)
+mkdir -p $(dirname $output_path)
+
 # lines -> raw format
 echo "lines -> raw format"
 if [ ! -f "${raw_tokens_path}" ]; then
@@ -40,6 +45,11 @@ else
     echo "File already exists"
 fi
 
+# rm raw tokens
+if [ -f "${raw_tokens_path}" ]; then
+    rm "${raw_tokens_path}"
+fi
+
 # rm ma
 if [ -f "${ma_path}" ]; then
     rm "${ma_path}"
@@ -54,4 +64,7 @@ else
     echo "File already exists"
 fi
 
-# TODO: rm md ?
+# compress md
+if [ -f "${md_path}" ]; then
+    gzip "${md_path}"
+fi
