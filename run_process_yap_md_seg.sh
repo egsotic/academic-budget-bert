@@ -26,7 +26,7 @@ fi
 echo " -> ma"
 if { [ ! -f "${ma_path}" ] || [ ! -s "${ma_path}" ]; } && [ ! -f "${md_path}" ]; then
     echo "output file: ${ma_path}"
-    /home/nlp/egsotic/go/src/yap/yap hebma -addnnpnofeats -raw "${raw_tokens_path}" -out "${ma_path}" > /dev/null 2>&1
+    /home/nlp/egsotic/go/src/yap/yap hebma -addnnpnofeats -raw "${raw_tokens_path}" -out "${ma_path}" >> logs/ma.txt 2>&1
 else
     echo "File already exists"
 fi
@@ -35,7 +35,7 @@ fi
 echo " -> md"
 if [ ! -f "${md_path}" ]; then
     echo "output file: ${md_path}"
-    /home/nlp/egsotic/go/src/yap/yap md -stripnnpfeats -stream -in "${ma_path}" -om "${md_path}" > /dev/null 2>&1
+    /home/nlp/egsotic/go/src/yap/yap md -stripnnpfeats -stream -in "${ma_path}" -om "${md_path}" >> logs/md.txt 2>&1
 else
     echo "File already exists"
 fi
