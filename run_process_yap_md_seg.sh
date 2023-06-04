@@ -18,6 +18,12 @@ mkdir -p $(dirname $ma_path)
 mkdir -p $(dirname $md_path)
 mkdir -p $(dirname $output_path)
 
+if [ -f "${output_path}" ]; then
+    echo "File already exists"
+    exit 0
+fi
+
+
 # lines -> raw format
 echo "lines -> raw format"
 if [ ! -f "${raw_tokens_path}" ]; then
