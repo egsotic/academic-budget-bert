@@ -40,7 +40,7 @@ from torch.nn.modules.loss import MSELoss
 from torch.nn.parameter import Parameter
 from torch.utils import checkpoint
 from transformers import BertConfig, PreTrainedModel
-from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
+from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions, QuestionAnsweringModelOutput
 
 logger = logging.getLogger(__name__)
 
@@ -1217,6 +1217,97 @@ class BertForTokenClassification(BertPreTrainedModel):
         return TokenClassifierOutput(
             loss=loss,
             logits=logits,
+            hidden_states=None,
+            attentions=None,
+        )
+
+
+class BertModelWrapper(BertModel):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        attention_mask=None,
+        output_all_encoded_layers=False,
+        checkpoint_activations=False,
+        output_attentions=False,
+        **kwargs,
+    ):
+        outputs = super().forward(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            output_all_encoded_layers=output_all_encoded_layers,
+            checkpoint_activations=checkpoint_activations,
+            output_attentions=output_attentions
+        )
+        
+        encoded_layers, _ = outputs
+        
+        return BaseModelOutputWithPoolingAndCrossAttentions(
+            last_hidden_state=encoded_layers,
+        )
+
+
+class BertForQuestionAnswering(BertPreTrainedModel):
+    def __init__(self, config, args=None):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+
+        self.bert = BertModel(config, args)
+        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        attention_mask=None,
+        start_positions = None,
+        end_positions = None,
+        checkpoint_activations=False,
+        **kwargs,
+    ):
+        
+        outputs = self.bert(
+            input_ids,
+            token_type_ids,
+            attention_mask,
+            output_all_encoded_layers=False,
+            checkpoint_activations=checkpoint_activations,
+        )
+
+        # NOTE: original huggingface implementation doesn't use pooled output
+        sequence_output = outputs[0]
+
+        logits = self.qa_outputs(sequence_output)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1).contiguous()
+        end_logits = end_logits.squeeze(-1).contiguous()
+
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions = start_positions.clamp(0, ignored_index)
+            end_positions = end_positions.clamp(0, ignored_index)
+
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
             hidden_states=None,
             attentions=None,
         )
