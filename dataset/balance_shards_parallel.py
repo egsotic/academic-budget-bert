@@ -1,7 +1,9 @@
 import argparse
 from functools import partial
 import glob
+import math
 import os
+import random
 import time
 from typing import Dict, List
 import h5py
@@ -12,7 +14,7 @@ import multiprocessing as mp
 
 def read_file_length(path):
     with h5py.File(path, "r") as f:
-        r = (np.asarray(f[list(f.keys())[0]][:]).shape[0], path)
+        r = (f[list(f.keys())[0]].shape[0], path)
     return r
 
 def find_num_samples_in_shard_parallel(files):
@@ -31,7 +33,7 @@ def batch_iter(files_indices, size: int):
     current_batch = []
     current_size = 0
     
-    for (f, (start, end)) in tqdm.tqdm(files_indices, desc='batch'):
+    for (f, (start, end)) in files_indices:
         current_batch.append([f, (start, end)])
         current_size += end - start
         
@@ -70,7 +72,7 @@ def slice_dataset(dataset: Dict[str, np.array], start: int, end: int):
     }
 
 
-def balance_worker(batch_files_indices, block_size, out_dir, prefix):
+def balance_worker(batch_files_indices, block_size, out_dir, file_prefix, n_sub_dir):
     current_data = []
     current_size = 0
     current_files_indices_splits = []
@@ -86,7 +88,13 @@ def balance_worker(batch_files_indices, block_size, out_dir, prefix):
             current_files_indices_splits += [(f, (start, end))]
             
             if current_size == block_size:
-                out_path = os.path.join(out_dir, f"{prefix}{time.time()}.hdf5")
+                # split to 2-level hierarchy, good for many files
+                # dir_rnd = str(random.randint(0, n_sub_dir))
+                file_rnd = time.time()
+                # path_dir = os.path.join(out_dir, dir_rnd)
+                # os.makedirs(path_dir, exist_ok=True)
+                path_dir = out_dir
+                out_path = os.path.join(path_dir, f"{file_prefix}_{file_rnd}_{random.random()}.hdf5")
                 
                 write_dataset_to_file(current_data, out_path)
                 
@@ -96,7 +104,7 @@ def balance_worker(batch_files_indices, block_size, out_dir, prefix):
 
     return current_files_indices_splits
 
-def balance_parallel(files, out_dir, prefix):
+def balance_parallel(files, out_dir, file_prefix):
     sizes = find_num_samples_in_shard_parallel(files)
     if len(sizes) == 0:
         return
@@ -109,7 +117,11 @@ def balance_parallel(files, out_dir, prefix):
     print('total size', sum([x[0] for x in sizes]))
     print('block size', block_size)
     
-    worker = partial(balance_worker, block_size=block_size, out_dir=out_dir, prefix=prefix)
+    worker = partial(balance_worker, 
+                     block_size=block_size,
+                     out_dir=out_dir,
+                     file_prefix=file_prefix,
+                     n_sub_dir=max(10, int(math.sqrt(len(sizes)))))
     
     remaining_files_indices = all_files_indices
     remaining_size = sum(end - start for _, (start, end) in remaining_files_indices)
@@ -118,14 +130,19 @@ def balance_parallel(files, out_dir, prefix):
         # by size ascending order (packing as many small files togethe as possible)
         remaining_files_indices.sort(key=lambda t: t[1][1] - t[1][0])
         
-        with mp.Pool() as pool:
-            remaining_files_indices = sum(
-                pool.map(
-                    worker,
-                    batch_iter(remaining_files_indices, block_size),
-                    ),
-                start=[])
+        remaining_blocks = remaining_size // block_size
         
+        with mp.Pool(processes=mp.cpu_count() - 2) as pool:
+            k = max(1, remaining_blocks // pool._processes)
+            
+            new_remaining_files_indices = []
+            for batch_remaining_files_indices in tqdm.tqdm(pool.imap_unordered(
+                worker,
+                batch_iter(remaining_files_indices, k * block_size),
+            )):
+                new_remaining_files_indices += batch_remaining_files_indices
+        
+        remaining_files_indices = new_remaining_files_indices
         remaining_size = sum(end - start for _, (start, end) in remaining_files_indices)
 
     print('deleted samples', remaining_size)
@@ -164,8 +181,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir")
     parser.add_argument("--out_dir")
-    args = parser.parse_args()
-    files = glob.glob(os.path.join(args.dir, "**/*.hdf5"), recursive=True)
     
+    args = parser.parse_args()
+    
+    files = glob.glob(os.path.join(args.dir, "**/*.hdf5"), recursive=True)
         
     main(files, args.out_dir)
