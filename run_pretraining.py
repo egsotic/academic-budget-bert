@@ -691,7 +691,7 @@ def main():
     wandb_run_id = None
 
     # Load a checkpoint if resuming training
-    if args.load_training_checkpoint is not None:
+    if args.load_training_checkpoint is not None and os.path.isdir(args.load_training_checkpoint):
         start_epoch, wandb_run_id = prepare_resuming_checkpoint(args, model)
 
     # setup W&B logging

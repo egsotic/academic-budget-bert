@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import glob
 import logging
 import os
 
@@ -26,23 +27,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def write_shard(lines, f_idx, out_dir_path, name=None):
-    os.makedirs(out_dir_path, exist_ok=True)
-    filename = f"shard_{f_idx}.txt"
-    if name is not None and len(name) > 0:
-        filename = f"{name}_{filename}"
-    with open(os.path.join(out_dir_path, filename), "w") as fw:
+def write_shard(lines, f_idx, out_dir, prefix):
+    filename = f"{prefix}_{f_idx}.txt"
+
+    out_path = os.path.join(out_dir, filename)
+    with open(out_path, "w") as fw:
         for l in lines:
             fw.write(l)
 
-
 def list_files_in_dir(dir, data_prefix=".txt", file_name_grep=""):
-    dataset_files = [
-        os.path.join(dir, f)
-        for f in os.listdir(dir)
-        if os.path.isfile(os.path.join(dir, f)) and data_prefix in f and file_name_grep in f
+    return [
+        f for f in glob.glob(os.path.join(dir, file_name_grep), recursive=True)
     ]
-    return dataset_files
 
 
 if __name__ == "__main__":
@@ -61,6 +57,12 @@ if __name__ == "__main__":
         default="",
         help="A string to filter a subset of files from input directory",
     )
+    parser.add_argument(
+        "--prefix",
+        type=str,
+        default="shard",
+        help="A string to be prefix of each files name (e.g. test/train)",
+    )
 
     args = parser.parse_args()
     dataset_files = list_files_in_dir(args.data, file_name_grep=args.grep)
@@ -77,9 +79,19 @@ if __name__ == "__main__":
     lines_idx = 0
     for f in tqdm(dataset_files, smoothing=1):
         with open(f) as fp:
-            file_lines.extend(fp.readlines())
+            finish = False
+            line = None
+            while not finish:
+                try:
+                    line = fp.readline()
+                    file_lines.append(line)
+                    finish = line == ''
+                except Exception as e:
+                    print(e)
+                    continue
+        
         if lines_idx == args.ratio - 1:
-            write_shard(file_lines, f_idx, args.output_dir, name=args.grep)
+            write_shard(file_lines, f_idx, args.output_dir, args.prefix)
             file_lines = []
             f_idx += 1
             lines_idx = 0
