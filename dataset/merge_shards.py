@@ -77,9 +77,19 @@ if __name__ == "__main__":
     file_lines = []
     f_idx = 0
     lines_idx = 0
-    for f in tqdm(dataset_files, smoothing=1):        
+    for f in tqdm(dataset_files, smoothing=1):
         with open(f) as fp:
-            file_lines.extend(fp.readlines())
+            finish = False
+            line = None
+            while not finish:
+                try:
+                    line = fp.readline()
+                    file_lines.append(line)
+                    finish = line == ''
+                except Exception as e:
+                    print(e)
+                    continue
+        
         if lines_idx == args.ratio - 1:
             write_shard(file_lines, f_idx, args.output_dir, args.prefix)
             file_lines = []
