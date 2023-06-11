@@ -96,3 +96,62 @@ def heb_separate_prefixes_suffixes(text: str):
                                text_sep_prefixes)
     
     return text_sep_suffixes
+
+
+if __name__ == "__main__":
+    import argparse
+    import tokenizers
+    import multiprocessing as mp
+    import os
+    import tqdm
+    
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--input_path")
+    parser.add_argument("--output_dir")
+    parser.add_argument("--n_processes", type=int)
+    
+    args = parser.parse_args()
+    
+    input_path = args.input_path
+    output_dir = args.output_dir
+    n_processes = args.n_processes
+    
+    tokenizer = tokenizers.pre_tokenizers.BertPreTokenizer()
+
+    def tokenize_text(text):
+        return [w for w, _ in tokenizer.pre_tokenize_str(text)]
+
+    def batch_iter(items, batch_size):
+        batch = []
+        
+        for x in items:
+            batch.append(x)
+            
+            if len(batch) >= batch_size:
+                yield batch[:]
+                
+                batch = []
+        
+        if len(batch) > 0:
+            yield batch
+    
+    def worker(path):
+        file_name = os.path.basename(path)
+        output_path = os.path.join(output_dir, file_name)
+        
+        with open(path, 'r', encoding='utf-8') as f_in:
+            with open(output_path, 'w', encoding='utf-8') as f_out:
+                for lines in batch_iter(f_in, batch_size=256):
+                    try:
+                        tokenized_text = ';;;'.join(' '.join(tokenize_text(line)) for line in lines)
+                        presuf_separated_text = heb_separate_prefixes_suffixes(tokenized_text)
+                        presuf_separated_text = presuf_separated_text.replace(';;;', '\n')
+                        f_out.write(presuf_separated_text + os.linesep)
+                        f_out.flush()
+                    except Exception as e:
+                        print(e)
+
+    with mp.Pool(n_processes) as pool:
+        for _ in tqdm.tqdm(pool.imap_unordered(worker, glob.glob(input_path))):
+            pass
