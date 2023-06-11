@@ -8,7 +8,7 @@ import tqdm
 from transformers import PreTrainedTokenizerFast
 
 
-MORPH_DELIMITER = 'O'
+MORPH_DELIMITER = 'o'
 
 def prepare_segmented_text_for_tokenizer(segmented_text: str, 
                                          seg_delimiter: str='|',
