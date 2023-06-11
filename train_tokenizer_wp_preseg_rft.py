@@ -29,9 +29,9 @@ def train_tokenizer(corpus_file: str, output_dir: str, vocab_size: int):
     
     morph_special_tokens = [
         # prefix
-        *[p + MORPH_DELIMITER.lower() for p in list('משהוכלב') + ['כש', 'מש']],
+        *[p + MORPH_DELIMITER for p in list('משהוכלב') + ['כש', 'מש']],
         # suffix
-        *[MORPH_DELIMITER.lower() + s for s in list('יךהוםן') + ['נו', 'כם', 'כן', 'הם', 'הן']],
+        *[MORPH_DELIMITER + s for s in list('יךהוםן') + ['נו', 'כם', 'כן', 'הם', 'הן']],
     ]
 
     special_tokens = ["[PAD]", unk_token, "[CLS]", "[SEP]", "[MASK]"] + morph_special_tokens
