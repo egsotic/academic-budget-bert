@@ -104,14 +104,15 @@ def balance_worker(batch_files_indices, block_size, out_dir, file_prefix, n_sub_
 
     return current_files_indices_splits
 
-def balance_parallel(files, out_dir, file_prefix):
+def balance_parallel(files, out_dir, file_prefix, n_processes, block_size):
     sizes = find_num_samples_in_shard_parallel(files)
     if len(sizes) == 0:
         return
     
     all_files_indices = [(f, (0, size)) for size, f in sizes if size > 0]
-    # TODO: can be determined by script and not by amount of files
-    block_size = sum([x[0] for x in sizes]) // len(sizes)
+
+    if block_size is None:
+        block_size = sum([x[0] for x in sizes]) // len(sizes)
     
     print('total files', len(sizes))
     print('total size', sum([x[0] for x in sizes]))
@@ -132,7 +133,7 @@ def balance_parallel(files, out_dir, file_prefix):
         
         remaining_blocks = remaining_size // block_size
         
-        with mp.Pool(processes=mp.cpu_count() - 2) as pool:
+        with mp.Pool(processes=n_processes) as pool:
             k = max(1, remaining_blocks // pool._processes)
             
             new_remaining_files_indices = []
@@ -171,19 +172,22 @@ def split_files_indices(files_indices, block_size: int):
         
         yield (f, [indices for indices in current_block])
 
-def main(files, out_dir):
+def main(files, out_dir, n_processes, test_block_size, train_block_size):
     train_files = [file for file in files if "train_shard" in file]
     test_files = [file for file in files if "test_shard" in file]
-    balance_parallel(train_files, out_dir, "train_shard_")
-    balance_parallel(test_files, out_dir, "test_shard_")
+    balance_parallel(train_files, out_dir, "train_shard_", n_processes, train_block_size)
+    balance_parallel(test_files, out_dir, "test_shard_", n_processes, test_block_size)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir")
     parser.add_argument("--out_dir")
+    parser.add_argument("--n_processes", type=int)
+    parser.add_argument("--train_block_size", type=int, default=None)
+    parser.add_argument("--test_block_size", type=int, default=None)
     
     args = parser.parse_args()
     
     files = glob.glob(os.path.join(args.dir, "**/*.hdf5"), recursive=True)
         
-    main(files, args.out_dir)
+    main(files, args.out_dir, args.n_processes, args.test_block_size, args.train_block_size)
