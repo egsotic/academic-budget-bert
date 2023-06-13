@@ -65,6 +65,7 @@ if __name__ == "__main__":
         default=20,
     )
     parser.add_argument("--n_processes", type=int, default=8, help="number of parallel processes")
+    parser.add_argument("--skip_exist", action='store_true', help="whether to skip existing output files (for previously stopped processing)")
 
     args = parser.parse_args()
 
@@ -79,6 +80,11 @@ if __name__ == "__main__":
 
     def create_shard(f_path, shard_idx, set_group, args):
         output_filename = os.path.join(new_shards_output, f"{set_group}_shard_{shard_idx}.hdf5")
+        
+        if args.skip_exist and os.path.exists(output_filename):
+            print('skip', set_group, shard_idx)
+            return None
+        
         if "roberta" in args.model_name:
             hdf5_preprocessing_cmd = "python data/create_pretraining_data_roberta.py"
         else:
@@ -119,4 +125,6 @@ if __name__ == "__main__":
             set_group = "train" if "train" in file_name else "test"
             last_process = create_shard(f, shard_idx[set_group], set_group, args)
             shard_idx[set_group] += 1
-    last_process.wait()
+    
+    if last_process is not None:
+        last_process.wait()
