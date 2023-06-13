@@ -172,11 +172,18 @@ def split_files_indices(files_indices, block_size: int):
         
         yield (f, [indices for indices in current_block])
 
-def main(files, out_dir, n_processes, test_block_size, train_block_size):
-    train_files = [file for file in files if "train_shard" in file]
-    test_files = [file for file in files if "test_shard" in file]
-    balance_parallel(train_files, out_dir, "train_shard_", n_processes, train_block_size)
-    balance_parallel(test_files, out_dir, "test_shard_", n_processes, test_block_size)
+def main(files, out_dir, n_processes, train_block_size, test_block_size):
+    if train_block_size != -1:
+        train_files = [file for file in files if "train_shard" in file]
+        balance_parallel(train_files, out_dir, "train_shard_", n_processes, train_block_size)
+    else:
+        print('skipping train')
+        
+    if test_block_size != -1:
+        test_files = [file for file in files if "test_shard" in file]
+        balance_parallel(test_files, out_dir, "test_shard_", n_processes, test_block_size)
+    else:
+        print('skipping test')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -190,4 +197,4 @@ if __name__ == "__main__":
     
     files = glob.glob(os.path.join(args.dir, "**/*.hdf5"), recursive=True)
         
-    main(files, args.out_dir, args.n_processes, args.test_block_size, args.train_block_size)
+    main(files, args.out_dir, args.n_processes, args.train_block_size, args.test_block_size)
